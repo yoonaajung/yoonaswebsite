@@ -1,6 +1,7 @@
 import cors from "@fastify/cors";
 import Fastify from "fastify";
 import { z } from "zod";
+import { buildUserProgress } from "./progress.js";
 import { applyFaceoffVote, computeCompatibilityForUser } from "./scoring.js";
 import { store } from "./store.js";
 import type { Product, ProductCategory } from "./types.js";
@@ -155,6 +156,17 @@ app.post("/checkins", async (request, reply) => {
   return reply.code(201).send({ saved: true });
 });
 
+app.get("/checkins/:userId", async (request, reply) => {
+  const params = z.object({ userId: z.string() }).parse(request.params);
+  if (!store.users.has(params.userId)) {
+    return reply.code(404).send({ error: "Unknown userId" });
+  }
+  const checkins = store.checkins
+    .filter((entry) => entry.userId === params.userId)
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  return { checkins };
+});
+
 app.get("/scores/:userId", async (request, reply) => {
   const params = z.object({ userId: z.string() }).parse(request.params);
   if (!store.users.has(params.userId)) {
@@ -162,6 +174,14 @@ app.get("/scores/:userId", async (request, reply) => {
   }
   const scores = computeCompatibilityForUser(params.userId);
   return { scores };
+});
+
+app.get("/progress/:userId", async (request, reply) => {
+  const params = z.object({ userId: z.string() }).parse(request.params);
+  if (!store.users.has(params.userId)) {
+    return reply.code(404).send({ error: "Unknown userId" });
+  }
+  return buildUserProgress(params.userId);
 });
 
 const seedProducts: Product[] = [

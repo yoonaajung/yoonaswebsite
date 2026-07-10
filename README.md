@@ -26,7 +26,10 @@ Current `App.tsx` includes setup stages:
 2. permissions (camera, location, health/shop toggles)
 3. baseline camera scan
 4. product source connect
-5. setup completion + score lock messaging
+5. API-connected launch into:
+   - Dashboard (unlock progress + product ratings + score cards)
+   - Face-Off (A/B vote capture)
+   - Check-in (daily streak input)
 
 ## API setup
 
@@ -47,7 +50,9 @@ Server default URL: `http://localhost:3001`
 - `POST /ratings`
 - `POST /faceoffs/vote`
 - `POST /checkins`
+- `GET /checkins/:userId`
 - `GET /scores/:userId`
+- `GET /progress/:userId`
 
 ## Compatibility scoring
 
