@@ -12,6 +12,19 @@ Starter codebase for a skincare progress app focused on:
 - `mobile/` - Expo React Native app (setup flow + camera/location permissions)
 - `server/` - Fastify TypeScript API (onboarding, ratings, face-offs, compatibility scoring)
 
+## Run both backend + app with one command
+
+From repo root:
+
+```bash
+npm install
+npm run dev:all
+```
+
+This starts:
+- API (`server`) on port `3001`
+- Expo mobile dev server (`mobile`)
+
 ## Mobile app setup
 
 ```bash
