@@ -1,0 +1,12 @@
+{
+  "name": "skin-twin-workspace",
+  "private": true,
+  "scripts": {
+    "dev:server": "npm run dev --prefix server",
+    "dev:mobile": "npm run start --prefix mobile",
+    "dev:all": "concurrently -k -n api,mobile -c cyan,magenta \"npm run dev:server\" \"npm run dev:mobile\""
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.3"
+  }
+}
