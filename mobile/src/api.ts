@@ -2,6 +2,7 @@ import type {
   FaceoffCriterion,
   OnboardingPayload,
   Product,
+  ProductGuidance,
   ProgressPayload,
   Score,
 } from "./types";
@@ -102,4 +103,18 @@ export async function fetchProgress(
 ): Promise<ProgressPayload> {
   const response = await fetch(buildUrl(baseUrl, `/progress/${encodeURIComponent(userId)}`));
   return parseResponse<ProgressPayload>(response);
+}
+
+export async function fetchProductGuidance(
+  baseUrl: string,
+  userId: string,
+  productId: string,
+): Promise<ProductGuidance> {
+  const response = await fetch(
+    buildUrl(
+      baseUrl,
+      `/products/${encodeURIComponent(productId)}/guidance/${encodeURIComponent(userId)}`,
+    ),
+  );
+  return parseResponse<ProductGuidance>(response);
 }

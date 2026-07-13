@@ -10,6 +10,14 @@ export interface Product {
   brand: string;
   category: string;
   ingredients: string[];
+  usageInstructions: string;
+  bestUseTime: "am" | "pm" | "either";
+  precautionCodes: string[];
+  affiliateLinks: {
+    amazon?: string;
+    sephora?: string;
+    brand?: string;
+  };
 }
 
 export interface Score {
@@ -53,5 +61,30 @@ export interface OnboardingPayload {
     healthEnabled: boolean;
     shoppingEnabled: boolean;
     cycleTrackingEnabled: boolean;
+  };
+}
+
+export interface ProductGuidance {
+  product: Product;
+  compatibility: Score | null;
+  usage: {
+    bestUseTime: "am" | "pm" | "either";
+    instructions: string;
+    precautions: Array<{
+      code: string;
+      icon: string;
+      label: string;
+      detail: string;
+    }>;
+  };
+  ingredients: {
+    bestForYou: Array<{
+      ingredient: string;
+      reason: string;
+    }>;
+    cautionForYou: Array<{
+      ingredient: string;
+      reason: string;
+    }>;
   };
 }

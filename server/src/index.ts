@@ -1,6 +1,7 @@
 import cors from "@fastify/cors";
 import Fastify from "fastify";
 import { z } from "zod";
+import { buildProductGuidance } from "./product-guidance.js";
 import { buildUserProgress } from "./progress.js";
 import { applyFaceoffVote, computeCompatibilityForUser } from "./scoring.js";
 import { store } from "./store.js";
@@ -35,6 +36,27 @@ const productSchema = z.object({
     "other",
   ] satisfies ProductCategory[]),
   ingredients: z.array(z.string()),
+  usageInstructions: z.string().min(1).optional(),
+  bestUseTime: z.enum(["am", "pm", "either"]).optional(),
+  precautionCodes: z
+    .array(
+      z.enum([
+        "night-only",
+        "spf-required",
+        "patch-test",
+        "start-slow",
+        "avoid-overlayering",
+        "hydrate-after",
+      ]),
+    )
+    .optional(),
+  affiliateLinks: z
+    .object({
+      amazon: z.string().url().optional(),
+      sephora: z.string().url().optional(),
+      brand: z.string().url().optional(),
+    })
+    .optional(),
 });
 
 const ratingSchema = z.object({
@@ -97,12 +119,40 @@ app.post("/products", async (request, reply) => {
   const normalized: Product = {
     ...payload,
     ingredients: payload.ingredients.map((item) => item.trim()),
+    usageInstructions:
+      payload.usageInstructions ?? "Use as directed by product label and monitor skin response.",
+    bestUseTime: payload.bestUseTime ?? "either",
+    precautionCodes: payload.precautionCodes ?? [],
+    affiliateLinks: payload.affiliateLinks ?? {},
   };
   store.products.set(payload.id, normalized);
   return reply.code(201).send({ saved: true, productId: payload.id });
 });
 
 app.get("/products", async () => Array.from(store.products.values()));
+
+app.get("/products/:productId", async (request, reply) => {
+  const params = z.object({ productId: z.string() }).parse(request.params);
+  const product = store.products.get(params.productId);
+  if (!product) {
+    return reply.code(404).send({ error: "Unknown productId" });
+  }
+  return product;
+});
+
+app.get("/products/:productId/guidance/:userId", async (request, reply) => {
+  const params = z
+    .object({
+      productId: z.string().min(1),
+      userId: z.string().min(1),
+    })
+    .parse(request.params);
+  const guidance = buildProductGuidance(params.userId, params.productId);
+  if (!guidance) {
+    return reply.code(404).send({ error: "Unknown userId or productId" });
+  }
+  return guidance;
+});
 
 app.post("/ratings", async (request, reply) => {
   const payload = ratingSchema.parse(request.body);
@@ -191,6 +241,21 @@ const seedProducts: Product[] = [
     brand: "Differin",
     category: "retinoid",
     ingredients: ["Adapalene", "Carbomer", "Poloxamer"],
+    usageInstructions:
+      "Apply a pea-sized amount to dry skin at night after cleansing. Follow with moisturizer.",
+    bestUseTime: "pm",
+    precautionCodes: [
+      "night-only",
+      "spf-required",
+      "patch-test",
+      "start-slow",
+      "avoid-overlayering",
+      "hydrate-after",
+    ],
+    affiliateLinks: {
+      amazon: "https://www.amazon.com/",
+      brand: "https://differin.com/",
+    },
   },
   {
     id: "cera-moisturizer",
@@ -198,6 +263,13 @@ const seedProducts: Product[] = [
     brand: "CeraVe",
     category: "moisturizer",
     ingredients: ["Ceramide NP", "Hyaluronic Acid", "Glycerin"],
+    usageInstructions: "Apply after cleansing in AM and PM. Reapply whenever skin feels dry.",
+    bestUseTime: "either",
+    precautionCodes: ["patch-test", "hydrate-after"],
+    affiliateLinks: {
+      amazon: "https://www.amazon.com/",
+      brand: "https://www.cerave.com/",
+    },
   },
   {
     id: "salicylic-cleanser",
@@ -205,6 +277,13 @@ const seedProducts: Product[] = [
     brand: "SkinLab",
     category: "cleanser",
     ingredients: ["Salicylic Acid", "Niacinamide", "Glycerin"],
+    usageInstructions:
+      "Use once daily initially, massage for 20-30 seconds, then rinse and moisturize.",
+    bestUseTime: "either",
+    precautionCodes: ["patch-test", "start-slow", "hydrate-after"],
+    affiliateLinks: {
+      sephora: "https://www.sephora.com/",
+    },
   },
 ];
 

@@ -6,6 +6,14 @@ export type ProductCategory =
   | "retinoid"
   | "other";
 
+export type ProductPrecautionCode =
+  | "night-only"
+  | "spf-required"
+  | "patch-test"
+  | "start-slow"
+  | "avoid-overlayering"
+  | "hydrate-after";
+
 export interface UserProfile {
   id: string;
   createdAt: string;
@@ -24,6 +32,14 @@ export interface Product {
   brand: string;
   category: ProductCategory;
   ingredients: string[];
+  usageInstructions: string;
+  bestUseTime: "am" | "pm" | "either";
+  precautionCodes: ProductPrecautionCode[];
+  affiliateLinks: {
+    amazon?: string;
+    sephora?: string;
+    brand?: string;
+  };
 }
 
 export interface ProductRating {
@@ -77,4 +93,30 @@ export interface UserProductPairState {
   userId: string;
   productId: string;
   eloByCriterion: Record<FaceoffCriterion, number>;
+}
+
+export interface IngredientInsight {
+  ingredient: string;
+  reason: string;
+}
+
+export interface PrecautionInstruction {
+  code: ProductPrecautionCode;
+  icon: string;
+  label: string;
+  detail: string;
+}
+
+export interface ProductGuidance {
+  product: Product;
+  compatibility: CompatibilityOutput | null;
+  usage: {
+    bestUseTime: Product["bestUseTime"];
+    instructions: string;
+    precautions: PrecautionInstruction[];
+  };
+  ingredients: {
+    bestForYou: IngredientInsight[];
+    cautionForYou: IngredientInsight[];
+  };
 }

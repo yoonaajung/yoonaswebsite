@@ -4,6 +4,7 @@ import { StatusBar } from "expo-status-bar";
 import { useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Linking,
   Platform,
   Pressable,
   SafeAreaView,
@@ -15,6 +16,7 @@ import {
   View,
 } from "react-native";
 import {
+  fetchProductGuidance,
   fetchProducts,
   fetchProgress,
   fetchScores,
@@ -23,7 +25,13 @@ import {
   submitOnboarding,
   submitRating,
 } from "./src/api";
-import type { FaceoffCriterion, Product, ProgressPayload, Score } from "./src/types";
+import type {
+  FaceoffCriterion,
+  Product,
+  ProductGuidance,
+  ProgressPayload,
+  Score,
+} from "./src/types";
 
 type SetupStep = "profile" | "permissions" | "scan" | "connect";
 type MainTab = "dashboard" | "faceoff" | "checkin";
@@ -68,6 +76,10 @@ export default function App() {
   const [products, setProducts] = useState<Product[]>([]);
   const [scores, setScores] = useState<Score[]>([]);
   const [progress, setProgress] = useState<ProgressPayload | null>(null);
+  const [guidanceByProduct, setGuidanceByProduct] = useState<
+    Record<string, ProductGuidance | undefined>
+  >({});
+  const [expandedProductId, setExpandedProductId] = useState<string | null>(null);
   const [ratingDrafts, setRatingDrafts] = useState<Record<string, RatingDraft>>({});
   const [criterion, setCriterion] = useState<FaceoffCriterion>("overall");
   const [certainty, setCertainty] = useState(3);
@@ -145,6 +157,8 @@ export default function App() {
     setProducts(nextProducts);
     setScores(nextScores);
     setProgress(nextProgress);
+    setGuidanceByProduct({});
+    setExpandedProductId(null);
   };
 
   const finishOnboarding = async () => {
@@ -218,6 +232,31 @@ export default function App() {
       setErrorText(error instanceof Error ? error.message : "Failed to save check-in.");
     } finally {
       setIsBusy(false);
+    }
+  };
+
+  const loadGuidance = async (productId: string) => {
+    if (guidanceByProduct[productId]) return;
+    setIsBusy(true);
+    setErrorText("");
+    try {
+      const guidance = await fetchProductGuidance(apiBaseUrl, userId, productId);
+      setGuidanceByProduct((current) => ({
+        ...current,
+        [productId]: guidance,
+      }));
+    } catch (error) {
+      setErrorText(error instanceof Error ? error.message : "Failed to load product guidance.");
+    } finally {
+      setIsBusy(false);
+    }
+  };
+
+  const openExternalUrl = async (url: string) => {
+    try {
+      await Linking.openURL(url);
+    } catch {
+      setErrorText(`Unable to open ${url}`);
     }
   };
 
@@ -453,6 +492,8 @@ export default function App() {
           irritation: 2,
         };
         const score = scores.find((entry) => entry.productId === product.id);
+        const guidance = guidanceByProduct[product.id];
+        const isExpanded = expandedProductId === product.id;
         return (
           <View key={product.id} style={styles.listItem}>
             <Text style={styles.listTitle}>
@@ -490,6 +531,79 @@ export default function App() {
             <Pressable style={styles.secondaryButton} onPress={() => saveRating(product.id)}>
               <Text style={styles.secondaryButtonText}>Save rating</Text>
             </Pressable>
+            <Pressable
+              style={styles.tertiaryButton}
+              onPress={async () => {
+                const shouldExpand = !isExpanded;
+                setExpandedProductId(shouldExpand ? product.id : null);
+                if (shouldExpand) {
+                  await loadGuidance(product.id);
+                }
+              }}
+            >
+              <Text style={styles.tertiaryButtonText}>
+                {isExpanded ? "Hide guidance" : "View guidance + precautions"}
+              </Text>
+            </Pressable>
+            {isExpanded && guidance ? (
+              <View style={styles.guidanceCard}>
+                <Text style={styles.guidanceTitle}>🕒 Best use time: {guidance.usage.bestUseTime}</Text>
+                <Text style={styles.guidanceBody}>{guidance.usage.instructions}</Text>
+                <Text style={styles.guidanceSectionLabel}>Precautions</Text>
+                {guidance.usage.precautions.map((item) => (
+                  <Text key={item.code} style={styles.guidanceBullet}>
+                    {item.icon} {item.label}: {item.detail}
+                  </Text>
+                ))}
+                <Text style={styles.guidanceSectionLabel}>Best ingredients for your profile</Text>
+                {guidance.ingredients.bestForYou.length > 0 ? (
+                  guidance.ingredients.bestForYou.map((item) => (
+                    <Text key={`best-${item.ingredient}`} style={styles.guidanceBullet}>
+                      ✅ {item.ingredient}: {item.reason}
+                    </Text>
+                  ))
+                ) : (
+                  <Text style={styles.guidanceBullet}>✅ No high-confidence positives yet.</Text>
+                )}
+                <Text style={styles.guidanceSectionLabel}>Watch-outs</Text>
+                {guidance.ingredients.cautionForYou.length > 0 ? (
+                  guidance.ingredients.cautionForYou.map((item) => (
+                    <Text key={`caution-${item.ingredient}`} style={styles.guidanceBullet}>
+                      ⚠️ {item.ingredient}: {item.reason}
+                    </Text>
+                  ))
+                ) : (
+                  <Text style={styles.guidanceBullet}>⚠️ No major caution flagged for now.</Text>
+                )}
+                <Text style={styles.guidanceSectionLabel}>Purchase links</Text>
+                <View style={styles.row}>
+                  {guidance.product.affiliateLinks.amazon ? (
+                    <Pressable
+                      style={styles.linkChip}
+                      onPress={() => openExternalUrl(guidance.product.affiliateLinks.amazon!)}
+                    >
+                      <Text style={styles.linkChipText}>Amazon</Text>
+                    </Pressable>
+                  ) : null}
+                  {guidance.product.affiliateLinks.sephora ? (
+                    <Pressable
+                      style={styles.linkChip}
+                      onPress={() => openExternalUrl(guidance.product.affiliateLinks.sephora!)}
+                    >
+                      <Text style={styles.linkChipText}>Sephora</Text>
+                    </Pressable>
+                  ) : null}
+                  {guidance.product.affiliateLinks.brand ? (
+                    <Pressable
+                      style={styles.linkChip}
+                      onPress={() => openExternalUrl(guidance.product.affiliateLinks.brand!)}
+                    >
+                      <Text style={styles.linkChipText}>Brand site</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              </View>
+            ) : null}
           </View>
         );
       })}
@@ -800,6 +914,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   secondaryButtonText: { color: "white", fontWeight: "700" },
+  tertiaryButton: {
+    backgroundColor: "#30406f",
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  tertiaryButtonText: { color: "#eef4ff", fontWeight: "700" },
   toggleRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -842,6 +963,43 @@ const styles = StyleSheet.create({
   },
   listTitle: { color: "#eef3ff", fontWeight: "700" },
   listSubtitle: { color: "#aab6da", marginTop: 2 },
+  guidanceCard: {
+    marginTop: 2,
+    backgroundColor: "#19264b",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#35509a",
+    padding: 10,
+    gap: 6,
+  },
+  guidanceTitle: {
+    color: "#eef4ff",
+    fontWeight: "700",
+  },
+  guidanceBody: {
+    color: "#cedaf9",
+    lineHeight: 18,
+  },
+  guidanceSectionLabel: {
+    color: "#dbe7ff",
+    fontWeight: "700",
+    marginTop: 4,
+  },
+  guidanceBullet: {
+    color: "#bfd1ff",
+    lineHeight: 18,
+  },
+  linkChip: {
+    backgroundColor: "#4c67c7",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  linkChipText: {
+    color: "white",
+    fontWeight: "700",
+    fontSize: 12,
+  },
   progressCard: {
     backgroundColor: "#1a2445",
     borderRadius: 12,

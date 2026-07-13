@@ -47,6 +47,8 @@ Server default URL: `http://localhost:3001`
 - `POST /onboarding`
 - `GET /products`
 - `POST /products`
+- `GET /products/:productId`
+- `GET /products/:productId/guidance/:userId`
 - `POST /ratings`
 - `POST /faceoffs/vote`
 - `POST /checkins`
